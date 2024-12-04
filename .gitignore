@@ -1,3 +1,6 @@
 /Data
 data.json
 /tests/
+/myenv/
+/.DS_Store
+__pycache__/
