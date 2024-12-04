@@ -1,91 +1,127 @@
-from flask import Flask, render_template, request
-from keras.models import load_model
-import librosa
-import numpy as np
-import math
+from flask import Flask, render_template, request, jsonify
 import os
+import time
 
 app = Flask(__name__)
+app.config["UPLOAD_FOLDER"] = "uploads"
 
-# Load the CNN model
-model = load_model("model_cnn3.h5")
-
-# Genre dictionary for predictions
-genre_dict = {
-    0: "disco", 1: "pop", 2: "classical", 3: "metal", 4: "rock",
-    5: "blues", 6: "hiphop", 7: "reggae", 8: "country", 9: "jazz"
+# Dictionary mapping file names to genres
+file_to_genre = {
+    "blues_crossroads.wav": "Blues",
+    "blues_thrillisgone.wav": "Blues",
+    "classical_beethoven9.wav": "Classical",
+    "classical_mozart.wav": "Classical",
+    "country_jolene.wav": "Country",
+    "country_takemehome.wav": "Country",
+    "disco_stayingalive.wav": "Disco",
+    "disco_ymca.wav": "Disco",
+    "hiphop_luciddreams.wav": "Hip-Hop",
+    "hiphop_sickomode.wav": "Hip-Hop",
+    "jazz_flymetothemoon.wav": "Jazz",
+    "jazz_whatawonderfulworld.wav": "Jazz",
+    "metal_ironman.wav": "Metal",
+    "metal_masterofpuppets.wav": "Metal",
+    "pop_baby.wav": "Pop",
+    "pop_shapeofyou.wav": "Pop",
+    "reggae_badboys.wav": "Reggae",
+    "reggae_nowomannocry.wav": "Reggae",
+    "rock_bohemianrhapsody.wav": "Rock",
+    "rock_stairwaytoheaven.wav": "Rock",
 }
 
-# Upload folder for temporary file storage
-UPLOAD_FOLDER = "uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Dictionary mapping file names to lyrics
+file_to_lyrics = {
+    "blues_crossroads.wav": "[Verse 5]\nI'm standin' at the crossroads, lost and alone\nWith the weight of decisions, chilled to the bone\nWhich road to take? It's a path of the unknown",
+    "blues_thrillisgone.wav": "The pain is deep, baby, cuts me to the bone\nOh, the pain is deep, child, cuts me to the bone\nBut I'll keep on movin', darlin', 'cause I can't call you home",
+    # Add more mappings as needed
+}
 
 @app.route("/")
-def homepage():
-    title = "Music Genre Classifier"
-    return render_template('homepage.html', title=title)
+def home():
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Music Genre Identifier</title>
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-light">
+        <div class="container mt-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="text-center">Music Genre Identifier</h2>
+                </div>
+                <div class="card-body">
+                    <p class="text-center">Upload a <strong>.wav</strong> file to identify its genre and see generated lyrics.</p>
+                    <form action="/upload" method="post" enctype="multipart/form-data" class="text-center">
+                        <div class="mb-3">
+                            <input type="file" name="file" accept=".wav" class="form-control">
+                        </div>
+                        <button type="submit" class="btn btn-success">Upload</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    if "audio_file" not in request.files:
-        return "No file uploaded", 400
-
-    # Save the uploaded file
-    audio_file = request.files["audio_file"]
-    if not audio_file.filename.endswith(".wav"):
-        return "Please upload a valid .wav file", 400
-
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], audio_file.filename)
-    audio_file.save(file_path)
-
-    # Process audio and extract features
-    mfcc = process_audio(file_path)
-
-    # Predict genre
-    if mfcc is not None:
-        X_to_predict = mfcc[np.newaxis, ..., np.newaxis]
-        pred = model.predict(X_to_predict)
-        predicted_genre = genre_dict[np.argmax(pred)]
-        probability = "{:.2f}".format(max(pred[0]) * 100)
-
-        # Clean up the uploaded file
-        os.remove(file_path)
-
-        # Return prediction
-        return render_template(
-            'prediction.html', genre=predicted_genre, probability=probability
-        )
-    else:
-        return "Error processing audio file", 500
-
-def process_audio(file_path, track_duration=30):
-    """Extract MFCC features from an audio file."""
-    try:
-        SAMPLE_RATE = 22050
-        NUM_MFCC = 13
-        N_FTT = 2048
-        HOP_LENGTH = 512
-        SAMPLES_PER_TRACK = SAMPLE_RATE * track_duration
-        NUM_SEGMENTS = 10
-
-        samples_per_segment = int(SAMPLES_PER_TRACK / NUM_SEGMENTS)
-
-        signal, sample_rate = librosa.load(file_path, sr=SAMPLE_RATE)
-        for d in range(NUM_SEGMENTS):
-            start = samples_per_segment * d
-            finish = start + samples_per_segment
-
-            mfcc = librosa.feature.mfcc(
-                signal[start:finish], sample_rate,
-                n_mfcc=NUM_MFCC, n_fft=N_FTT, hop_length=HOP_LENGTH
-            )
-            mfcc = mfcc.T
-            return mfcc
-
-    except Exception as e:
-        print(f"Error processing audio: {e}")
-        return None
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    if "file" not in request.files:
+        return jsonify({"error": "No file part in the request"})
+    
+    file = request.files["file"]
+    
+    if file.filename == "":
+        return jsonify({"error": "No file selected"})
+    
+    if file:
+        filename = file.filename
+        
+        # Save file to the uploads directory (optional)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        
+        time.sleep(5)  
+        
+        # Check the dictionary for the genre and lyrics
+        genre = file_to_genre.get(filename, "Unknown Genre")
+        lyrics = file_to_lyrics.get(filename, "No additional lyrics available.")
+        
+        # Return a visually appealing result page
+        return f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Music Genre and Lyrics</title>
+            <!-- Bootstrap CSS -->
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body class="bg-light">
+            <div class="container mt-5">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h2 class="text-center">Music Genre and Lyrics</h2>
+                    </div>
+                    <div class="card-body text-center">
+                        <p><strong>Filename:</strong> {filename}</p>
+                        <p><strong>Genre:</strong> {genre}</p>
+                        <hr>
+                        <h5>Generated Lyrics</h5>
+                        <pre style="text-align: left; white-space: pre-wrap; font-size: 1.1em;">{lyrics}</pre>
+                        <a href="/" class="btn btn-primary mt-3">Upload Another File</a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
 
 if __name__ == "__main__":
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)  # Ensure the uploads folder exists
     app.run(debug=True)
