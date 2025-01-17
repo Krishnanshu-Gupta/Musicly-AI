@@ -38,4 +38,14 @@ Data can be retrieved from the [GTZAN Genre Dataset](https://www.kaggle.com/data
 ### Preprocessing
 The dataset is processed by:
 - Splitting audio files into smaller segments for training (3-second clips).
+- Creating Audio Waveform, Spectogram, and Mel-Spectogram visualizations.
 - Extracting MFCC (Mel Frequency Cepstral Coefficients) features for each segment as input for the model.
+
+Visualizations:
+| Audio Spectrum | Audio Waveform |
+|---------------|----------------|
+| ![Audio Spectrum](images/audio_spectrum.png) | ![Audio Waveform](images/audio_waveform.png) |
+
+| Mel Spectrogram | MFCC |
+|-----------------|------|
+| ![Mel Spectrogram](images/mel_spectogram.png) | ![MFCC](images/mfcc.png) |
